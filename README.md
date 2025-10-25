@@ -1,115 +1,135 @@
-# IoCSweep.ps1 — README
+# IoCSweep.ps1 — GitHub README
 
-## Purpose
+## Overview
 
-**IoCSweep.ps1** performs automated collection and analysis of potential Indicators of Compromise (IoCs) on Windows. It is a modular forensic sweep tool that runs safely in read-only mode. The script is ideal for blue-team or incident-response baselines.
+**IoCSweep.ps1** is a PowerShell-based forensic triage tool for Windows systems. It automates the collection of potential Indicators of Compromise (IoCs) and provides structured output for blue team analysis or incident response.
 
-## What It Does
+It is designed for **transparency, portability, and zero system impact** — the script performs read-only enumeration and stores all results locally.
 
-The sweep checks multiple persistence and runtime vectors, including:
+---
 
-* **Running Processes** — active executables, file paths, digital signatures, hashes
-* **Kernel Drivers** — current and loaded `.sys` modules with publisher and hash info
-* **Autoruns** — Run / RunOnce / Startup folder entries
-* **Services** — all installed and running Windows services
-* **Scheduled Tasks** — all task definitions and associated actions
-* **WMI Event Subscriptions** — known persistence mechanism
-* **Recent Files** — last accessed or modified items under user profiles
-* **Network Connections** — open TCP/UDP sessions and listeners (from `netstat`)
+## ✳️ Features
 
-## Optional Features
+* Enumerates **running processes**, **kernel drivers**, **autoruns**, **services**, **scheduled tasks**, and **WMI event subscriptions**.
+* Captures **recently modified files** and **network connections**.
+* Supports optional **IoC file matching** (filenames, paths, domains, or hashes).
+* Supports optional **directory hashing** for deep scans (`-HashTrees`).
+* Auto-elevates if required for system-level enumeration.
+* Generates timestamped reports in portable CSV/TXT format.
 
-* **IoC File Input:** specify a text file with domains, file names, paths, or hashes. Each line is checked across all collected data.
-* **HashTrees:** optionally hash entire directories (for deep integrity sweeps)
-* **HashFast (planned):** hashes only loaded driver and process binaries for quick integrity validation.
+---
 
-## Output
+## 🧠 Why IoCSweep
 
-Each run creates a timestamped directory under the default root:
+Use IoCSweep to:
 
-```
-T:\GNO-JUNGLE\Jaguar\Reports\HostAudit\<HOST>_<YYYY-MM-DD_HH-mm-ss>\
-```
+* Quickly identify signs of persistence or lateral movement.
+* Verify the integrity and origin of drivers and executables.
+* Establish clean baselines for recurring host sweeps.
+* Supplement threat hunting or incident response playbooks.
 
-### Output Files
+---
 
-| File                              | Description                                 |
-| --------------------------------- | ------------------------------------------- |
-| `IoC_Summary_*.txt`               | Human-readable sweep summary                |
-| `IoC_Processes_*.csv`             | Active processes with signature & hash data |
-| `IoC_Drivers_*.csv`               | Loaded kernel drivers                       |
-| `IoC_Services_*.csv`              | Service configuration + binary path         |
-| `IoC_Autoruns_*.csv`              | Autorun persistence entries                 |
-| `IoC_ScheduledTasks_*.csv`        | All task actions & triggers                 |
-| `IoC_WMIEventSubscriptions_*.csv` | WMI event filters & consumers               |
-| `IoC_RecentFiles_*.csv`           | File-system recency list                    |
-| `IoC_Network_*.txt`               | Active network connections                  |
+## ⚙️ Requirements
 
-All files are CSV/TXT for easy import into Excel or SIEM.
+* **Windows 10/11** or **Windows Server 2016+**
+* **PowerShell 7.0+ (`pwsh`)**
+* Administrator privileges (script auto-elevates when needed)
 
-## Usage
+---
+
+## 📁 Output
+
+Each run writes results to a timestamped folder under a configurable output root.
+
+Default behavior:
 
 ```powershell
-# Basic sweep (auto-elevates)
+$env:HOSTAUDIT_ROOT   # If defined, IoCSweep writes here
+$HOME\Reports\HostAudit  # Fallback if HOSTAUDIT_ROOT is not defined
+```
+
+Folder structure example:
+
+```
+<OUTPUT_ROOT>/MyPC_2025-10-25_20-15-33/
+├── IoC_Summary_MyPC_2025-10-25_20-15-33.txt
+├── IoC_Processes_MyPC_2025-10-25_20-15-33.csv
+├── IoC_Drivers_MyPC_2025-10-25_20-15-33.csv
+├── IoC_Services_MyPC_2025-10-25_20-15-33.csv
+├── IoC_Autoruns_MyPC_2025-10-25_20-15-33.csv
+├── IoC_ScheduledTasks_MyPC_2025-10-25_20-15-33.csv
+├── IoC_WMIEventSubscriptions_MyPC_2025-10-25_20-15-33.csv
+├── IoC_RecentFiles_MyPC_2025-10-25_20-15-33.csv
+├── IoC_Network_MyPC_2025-10-25_20-15-33.txt
+└── IoC_UnsignedDrivers_MyPC_2025-10-25_20-15-33.csv
+```
+
+All files are stored in UTF-8 CSV/TXT format for compatibility with Excel, Splunk, SIEMs, or text search tools.
+
+---
+
+## 🧩 Parameters
+
+| Parameter            | Description                                                                |
+| -------------------- | -------------------------------------------------------------------------- |
+| `-IoCFile <path>`    | Path to newline-delimited list of IoCs (hashes, domains, filenames, paths) |
+| `-HashTrees <paths>` | Recursively hash specified directories (e.g., `C:\Windows\System32`)       |
+| `-OutputRoot <path>` | Custom root folder for reports (overrides environment variable)            |
+| `-RecentDays <int>`  | Number of days to include for recent file scan (default: 7)                |
+| `-NoExplorer`        | Skip auto-opening the results folder                                       |
+
+---
+
+## 🚀 Usage Examples
+
+```powershell
+# Standard sweep (auto-elevates)
 pwsh -File .\IoCSweep.ps1
 
-# Sweep with IoC feed from file
-pwsh -File .\IoCSweep.ps1 -IoCFile 'C:\feeds\ioc_list.txt'
+# Sweep with IoC list
+pwsh -File .\IoCSweep.ps1 -IoCFile 'C:\intel\ioc_feed.txt'
 
-# Include recursive hashing of directories
+# Deep scan: hash Windows and Program Files directories
 pwsh -File .\IoCSweep.ps1 -HashTrees 'C:\Windows\System32','C:\Program Files'
 
-# Skip opening the folder afterward
+# Custom output root (override default)
+pwsh -File .\IoCSweep.ps1 -OutputRoot 'D:\Forensics\IoCScans'
+
+# Quiet run, no Explorer popup
 pwsh -File .\IoCSweep.ps1 -NoExplorer
-```
-
-## Switches
-
-| Switch               | Description                                        |
-| -------------------- | -------------------------------------------------- |
-| `-IoCFile <path>`    | Path to IoC list file (hashes, domains, filenames) |
-| `-HashTrees <paths>` | Directories to hash recursively                    |
-| `-NoExplorer`        | Prevent auto-opening of output folder              |
-
-## Typical Workflow
-
-1. Run **Host-Audit.ps1** for baseline integrity check.
-2. Run **IoCSweep.ps1** to enumerate active indicators.
-3. Review `IoC_Summary_*.txt` first.
-4. Correlate with external threat intel (VirusTotal, MITRE ATT&CK).
-
-## Interpreting Results
-
-* Entries marked with *Signature Invalid* or *Unknown Publisher* should be verified.
-* Unexpected autoruns, scheduled tasks, or unsigned drivers may indicate persistence mechanisms.
-* Network results show foreign connections (look for public IPs outside normal services).
-
-## Requirements
-
-* PowerShell 7+ (`pwsh`)
-* Administrator privileges (script auto-elevates)
-* Default output path available or creatable (`T:` Dev Drive supported)
-
-## Safety
-
-* Read-only collection only — no modification, deletion, or registry changes.
-* All results stored locally; no remote upload.
-
-## Troubleshooting
-
-* **Access Denied:** re-run elevated (admin).
-* **Missing T: drive:** verify your Dev Drive is mounted; use Auto-Remap if needed.
-* **Large hash operations slow:** limit with `-HashFast` (when available) or target fewer paths.
-
-## Example Integration (Profile Aliases)
-
-```powershell
-function IoC-Sweep     { pwsh -File "$HOME\IoCSweep.ps1" }
-function IoC-Hash      { pwsh -File "$HOME\IoCSweep.ps1" -HashTrees 'C:\Windows\System32','C:\Program Files' }
-Set-Alias iocsweep IoC-Sweep
-Set-Alias iochash  IoC-Hash
 ```
 
 ---
 
-**Authoring note:** IoCSweep complements `Host-Audit.ps1` as part of the Jaguar host triage suite. Customize the default root path in the script header if your `T:` volume changes.
+## 🔍 Interpretation Tips
+
+* **Unsigned or non-Microsoft drivers** often require validation.
+* **Unexpected autoruns or tasks** may indicate persistence mechanisms.
+* **Foreign IPs or odd domains** in network results may represent exfiltration or C2 channels.
+* Review `IoC_Summary_*.txt` first — it provides a human-readable rollup of key findings.
+
+---
+
+## 🧰 Integrating with Profiles
+
+You can add convenient aliases to your PowerShell profile:
+
+```powershell
+function IoC-Sweep { pwsh -File "$HOME\IoCSweep.ps1" }
+Set-Alias iocsweep IoC-Sweep
+```
+
+Then just run:
+
+```powershell
+iocsweep
+```
+
+---
+
+## 🧾 License
+
+Released under the MIT License. Contributions and forks welcome.
+
+IoCSweep is part of a modular forensic tooling framework for Windows security ana
